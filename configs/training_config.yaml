@@ -1,0 +1,196 @@
+# Training Configuration for E-commerce LLM Fine-tuning
+# =====================================================
+# This config is optimized for QLoRA training on AWS g5.xlarge (24GB A10G)
+
+# Model Configuration
+model:
+  # Primary model - Mistral-7B (recommended for efficiency)
+  name: "mistralai/Mistral-7B-Instruct-v0.3"
+  # Alternative: LLaMA-3-8B for comparison
+  # name: "meta-llama/Meta-Llama-3-8B-Instruct"
+
+  # Maximum sequence length for training
+  max_seq_length: 2048
+
+  # Trust remote code (required for some models)
+  trust_remote_code: true
+
+# Quantization Configuration (QLoRA)
+# -----------------------------------
+# QLoRA = Quantized Low-Rank Adaptation
+# Allows training 7B models on 6-8GB VRAM
+quantization:
+  # Load base model in 4-bit precision
+  load_in_4bit: true
+
+  # NF4 (Normal Float 4) - better than INT4 for neural networks
+  bnb_4bit_quant_type: "nf4"
+
+  # Compute dtype for forward/backward pass
+  bnb_4bit_compute_dtype: "bfloat16"
+
+  # Double quantization - saves ~0.4 bits/param
+  bnb_4bit_use_double_quant: true
+
+# LoRA Configuration
+# ------------------
+# Low-Rank Adaptation: Train small adapter matrices instead of full model
+lora:
+  # Rank of the adapter matrices (higher = more capacity, more VRAM)
+  # Recommended: 32 for learning, 64 for production
+  r: 32
+
+  # Scaling factor (typically 2x rank)
+  lora_alpha: 64
+
+  # Target modules to apply LoRA
+  # For transformer models, target all linear layers
+  target_modules:
+    - "q_proj"   # Query projection
+    - "k_proj"   # Key projection
+    - "v_proj"   # Value projection
+    - "o_proj"   # Output projection
+    - "gate_proj"  # MLP gate
+    - "up_proj"    # MLP up
+    - "down_proj"  # MLP down
+
+  # Dropout for regularization
+  lora_dropout: 0.05
+
+  # Bias training strategy
+  bias: "none"
+
+  # Task type for PEFT
+  task_type: "CAUSAL_LM"
+
+# Training Configuration
+# ----------------------
+training:
+  # Output directory for checkpoints
+  output_dir: "models/checkpoints"
+
+  # Number of training epochs
+  # 3 epochs is usually optimal; more risks overfitting
+  num_train_epochs: 3
+
+  # Batch size per GPU
+  # Adjust based on VRAM; g5.xlarge can handle 4
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+
+  # Gradient accumulation to simulate larger batch sizes
+  # Effective batch size = 4 * 4 = 16
+  gradient_accumulation_steps: 4
+
+  # Learning rate (higher than full fine-tuning due to frozen base)
+  learning_rate: 2.0e-4
+
+  # Weight decay for regularization
+  weight_decay: 0.01
+
+  # Learning rate schedule
+  lr_scheduler_type: "cosine"
+
+  # Warmup ratio (percentage of training for warmup)
+  warmup_ratio: 0.03
+
+  # Optimizer
+  optim: "paged_adamw_8bit"
+
+  # Gradient checkpointing (saves ~30% memory)
+  gradient_checkpointing: true
+
+  # FP16/BF16 training
+  fp16: false
+  bf16: true
+
+  # Logging
+  logging_steps: 10
+  logging_dir: "logs"
+
+  # Evaluation
+  eval_strategy: "steps"
+  eval_steps: 500
+
+  # Saving
+  save_strategy: "steps"
+  save_steps: 500
+  save_total_limit: 3
+
+  # Best model selection
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+
+  # Performance optimizations
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+
+  # Reproducibility
+  seed: 42
+
+# Data Configuration
+# ------------------
+data:
+  # Primary dataset
+  dataset_name: "NingLab/ECInstruct"
+
+  # Train/validation/test splits
+  train_split: "train"
+  val_split: "validation"
+  test_split: "test"
+
+  # Mix ratio for preventing catastrophic forgetting
+  # 90% e-commerce + 10% general instruction data
+  general_data_ratio: 0.1
+  general_dataset: "tatsu-lab/alpaca"
+
+  # Preprocessing
+  max_examples: null  # Set to a number for quick testing
+  shuffle: true
+
+  # Task prefixes (for multi-task learning)
+  task_prefixes:
+    classification: "[CLASSIFY]"
+    extraction: "[EXTRACT]"
+    qa: "[QA]"
+
+# Inference Configuration (for evaluation)
+# ----------------------------------------
+inference:
+  # Temperature (0 for deterministic evaluation)
+  temperature: 0.0
+
+  # Maximum new tokens
+  max_new_tokens: 512
+
+  # Sampling parameters
+  do_sample: false
+  top_p: 1.0
+  top_k: 50
+
+# vLLM Server Configuration
+# -------------------------
+vllm:
+  # GPU memory utilization
+  gpu_memory_utilization: 0.85
+
+  # Maximum model length
+  max_model_len: 4096
+
+  # Data type
+  dtype: "half"
+
+  # Enable prefix caching (speeds up repeated prompts)
+  enable_prefix_caching: true
+
+# AWS Configuration
+# -----------------
+aws:
+  # Recommended instance
+  instance_type: "g5.xlarge"
+
+  # Use spot instances for experimentation
+  use_spot: true
+
+  # Region with best availability
+  region: "us-west-2"
