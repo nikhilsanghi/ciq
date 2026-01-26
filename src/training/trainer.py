@@ -625,7 +625,7 @@ def train_model(
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         dataset_text_field="text",  # Column containing formatted prompts
         max_seq_length=config.max_seq_length,
         packing=False,  # Disable packing for better loss computation

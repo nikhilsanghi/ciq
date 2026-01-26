@@ -281,7 +281,7 @@ class TrainingConfig:
     save_steps: int = 100
     save_total_limit: int = 3
     eval_steps: int = 100
-    evaluation_strategy: str = "steps"
+    eval_strategy: str = "steps"
 
     # Memory optimization
     gradient_checkpointing: bool = True
@@ -369,7 +369,7 @@ class TrainingConfig:
             save_steps=self.save_steps,
             save_total_limit=self.save_total_limit,
             eval_steps=self.eval_steps,
-            evaluation_strategy=self.evaluation_strategy,
+            eval_strategy=self.eval_strategy,
             gradient_checkpointing=self.gradient_checkpointing,
             bf16=self.bf16,
             tf32=self.tf32,
