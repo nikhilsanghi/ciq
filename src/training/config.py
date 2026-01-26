@@ -401,42 +401,59 @@ class TrainingConfig:
             SFTConfig: Configuration for TRL SFTTrainer.
         """
         from trl import SFTConfig
+        import inspect
 
-        return SFTConfig(
-            output_dir=self.output_dir,
-            num_train_epochs=self.num_train_epochs,
-            per_device_train_batch_size=self.per_device_train_batch_size,
-            per_device_eval_batch_size=self.per_device_eval_batch_size,
-            gradient_accumulation_steps=self.gradient_accumulation_steps,
-            learning_rate=self.learning_rate,
-            warmup_ratio=self.warmup_ratio,
-            weight_decay=self.weight_decay,
-            max_grad_norm=self.max_grad_norm,
-            lr_scheduler_type=self.lr_scheduler_type,
-            logging_steps=self.logging_steps,
-            save_steps=self.save_steps,
-            save_total_limit=self.save_total_limit,
-            eval_steps=self.eval_steps,
-            eval_strategy=self.eval_strategy,
-            gradient_checkpointing=self.gradient_checkpointing,
-            bf16=self.bf16,
-            tf32=self.tf32,
-            seed=self.seed,
-            report_to=self.report_to,
-            run_name=self.wandb_run_name,
-            resume_from_checkpoint=self.resume_from_checkpoint,
-            push_to_hub=self.push_to_hub,
-            hub_model_id=self.hub_model_id,
-            # Additional recommended settings
-            optim="paged_adamw_8bit",  # Memory-efficient optimizer
-            group_by_length=True,  # Batch similar-length sequences together
-            dataloader_pin_memory=True,  # Faster data transfer to GPU
-            remove_unused_columns=False,  # Keep all columns for custom formatting
-            # SFT-specific parameters (TRL 0.12+)
-            max_seq_length=self.max_seq_length,
-            dataset_text_field=dataset_text_field,
-            packing=packing,
-        )
+        # Build base config dict
+        config_kwargs = {
+            "output_dir": self.output_dir,
+            "num_train_epochs": self.num_train_epochs,
+            "per_device_train_batch_size": self.per_device_train_batch_size,
+            "per_device_eval_batch_size": self.per_device_eval_batch_size,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+            "learning_rate": self.learning_rate,
+            "warmup_ratio": self.warmup_ratio,
+            "weight_decay": self.weight_decay,
+            "max_grad_norm": self.max_grad_norm,
+            "lr_scheduler_type": self.lr_scheduler_type,
+            "logging_steps": self.logging_steps,
+            "save_steps": self.save_steps,
+            "save_total_limit": self.save_total_limit,
+            "eval_steps": self.eval_steps,
+            "gradient_checkpointing": self.gradient_checkpointing,
+            "bf16": self.bf16,
+            "tf32": self.tf32,
+            "seed": self.seed,
+            "report_to": self.report_to,
+            "run_name": self.wandb_run_name,
+            "resume_from_checkpoint": self.resume_from_checkpoint,
+            "push_to_hub": self.push_to_hub,
+            "hub_model_id": self.hub_model_id,
+            "optim": "paged_adamw_8bit",
+            "group_by_length": True,
+            "dataloader_pin_memory": True,
+            "remove_unused_columns": False,
+            "dataset_text_field": dataset_text_field,
+            "packing": packing,
+        }
+
+        # Get valid parameters for this version of SFTConfig
+        valid_params = set(inspect.signature(SFTConfig).parameters.keys())
+
+        # Handle parameter name variations across TRL versions
+        # eval_strategy vs evaluation_strategy
+        if "eval_strategy" in valid_params:
+            config_kwargs["eval_strategy"] = self.eval_strategy
+        elif "evaluation_strategy" in valid_params:
+            config_kwargs["evaluation_strategy"] = self.eval_strategy
+
+        # max_seq_length vs max_length (TRL version differences)
+        if "max_seq_length" in valid_params:
+            config_kwargs["max_seq_length"] = self.max_seq_length
+
+        # Filter to only valid parameters
+        config_kwargs = {k: v for k, v in config_kwargs.items() if k in valid_params}
+
+        return SFTConfig(**config_kwargs)
 
 
 def get_qlora_config(

@@ -619,15 +619,29 @@ def train_model(
         sft_config.resume_from_checkpoint = resume_from_checkpoint
         logger.info(f"Resuming from checkpoint: {resume_from_checkpoint}")
 
-    # Create SFTTrainer with SFTConfig (TRL 0.12+ API)
-    # Note: max_seq_length, dataset_text_field, and packing are now in SFTConfig
-    trainer = SFTTrainer(
-        model=model,
-        args=sft_config,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        processing_class=tokenizer,
-    )
+    # Build SFTTrainer kwargs - handle TRL version differences
+    import inspect
+    trainer_sig = inspect.signature(SFTTrainer)
+    trainer_params = set(trainer_sig.parameters.keys())
+
+    trainer_kwargs = {
+        "model": model,
+        "args": sft_config,
+        "train_dataset": train_dataset,
+        "eval_dataset": eval_dataset,
+    }
+
+    # Handle tokenizer parameter name (processing_class vs tokenizer)
+    if "processing_class" in trainer_params:
+        trainer_kwargs["processing_class"] = tokenizer
+    else:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    # Pass max_seq_length directly if SFTTrainer accepts it (older TRL versions)
+    if "max_seq_length" in trainer_params:
+        trainer_kwargs["max_seq_length"] = config.max_seq_length
+
+    trainer = SFTTrainer(**trainer_kwargs)
 
     # Save config for reproducibility
     config_save_path = Path(config.output_dir) / "training_config.yaml"
