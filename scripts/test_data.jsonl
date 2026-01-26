@@ -1,0 +1,10 @@
+{"text": "[CLASSIFY] Product: Blue Cotton T-Shirt\nCategory: Apparel > Shirts"}
+{"text": "[CLASSIFY] Product: iPhone 15 Pro Case\nCategory: Electronics > Accessories"}
+{"text": "[CLASSIFY] Product: Running Shoes Nike\nCategory: Apparel > Footwear"}
+{"text": "[CLASSIFY] Product: Organic Coffee Beans\nCategory: Food > Beverages"}
+{"text": "[CLASSIFY] Product: Yoga Mat Premium\nCategory: Sports > Fitness"}
+{"text": "[EXTRACT] Product: Samsung Galaxy S24 Ultra 256GB Titanium Black\nAttributes: {\"brand\": \"Samsung\", \"model\": \"Galaxy S24 Ultra\", \"storage\": \"256GB\", \"color\": \"Titanium Black\"}"}
+{"text": "[EXTRACT] Product: Levi's 501 Original Fit Jeans Men's 32x30 Dark Wash\nAttributes: {\"brand\": \"Levi's\", \"style\": \"501 Original Fit\", \"size\": \"32x30\", \"wash\": \"Dark\"}"}
+{"text": "[QA] Product: Instant Pot Duo 7-in-1 Electric Pressure Cooker 6 Quart\nQuestion: Can this be used for slow cooking?\nAnswer: Yes, the Instant Pot Duo 7-in-1 includes a slow cooker function among its 7 cooking modes."}
+{"text": "[QA] Product: Apple AirPods Pro 2nd Generation\nQuestion: Does it have noise cancellation?\nAnswer: Yes, the AirPods Pro 2nd Generation features Active Noise Cancellation (ANC) and Transparency mode."}
+{"text": "[CLASSIFY] Product: KitchenAid Stand Mixer 5-Quart Artisan Series\nCategory: Home & Garden > Kitchen > Appliances > Mixers"}

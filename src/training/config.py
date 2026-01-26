@@ -386,6 +386,58 @@ class TrainingConfig:
             remove_unused_columns=False,  # Keep all columns for custom formatting
         )
 
+    def to_sft_config(self, dataset_text_field: str = "text", packing: bool = False):
+        """
+        Convert to TRL SFTConfig for SFTTrainer.
+
+        TRL 0.12+ requires SFTConfig which combines TrainingArguments with
+        SFT-specific parameters like max_seq_length, dataset_text_field, etc.
+
+        Args:
+            dataset_text_field: Column name containing formatted prompts
+            packing: Whether to pack multiple short examples into one sequence
+
+        Returns:
+            SFTConfig: Configuration for TRL SFTTrainer.
+        """
+        from trl import SFTConfig
+
+        return SFTConfig(
+            output_dir=self.output_dir,
+            num_train_epochs=self.num_train_epochs,
+            per_device_train_batch_size=self.per_device_train_batch_size,
+            per_device_eval_batch_size=self.per_device_eval_batch_size,
+            gradient_accumulation_steps=self.gradient_accumulation_steps,
+            learning_rate=self.learning_rate,
+            warmup_ratio=self.warmup_ratio,
+            weight_decay=self.weight_decay,
+            max_grad_norm=self.max_grad_norm,
+            lr_scheduler_type=self.lr_scheduler_type,
+            logging_steps=self.logging_steps,
+            save_steps=self.save_steps,
+            save_total_limit=self.save_total_limit,
+            eval_steps=self.eval_steps,
+            eval_strategy=self.eval_strategy,
+            gradient_checkpointing=self.gradient_checkpointing,
+            bf16=self.bf16,
+            tf32=self.tf32,
+            seed=self.seed,
+            report_to=self.report_to,
+            run_name=self.wandb_run_name,
+            resume_from_checkpoint=self.resume_from_checkpoint,
+            push_to_hub=self.push_to_hub,
+            hub_model_id=self.hub_model_id,
+            # Additional recommended settings
+            optim="paged_adamw_8bit",  # Memory-efficient optimizer
+            group_by_length=True,  # Batch similar-length sequences together
+            dataloader_pin_memory=True,  # Faster data transfer to GPU
+            remove_unused_columns=False,  # Keep all columns for custom formatting
+            # SFT-specific parameters (TRL 0.12+)
+            max_seq_length=self.max_seq_length,
+            dataset_text_field=dataset_text_field,
+            packing=packing,
+        )
+
 
 def get_qlora_config(
     load_in_4bit: bool = True,
@@ -574,7 +626,7 @@ def save_config_to_yaml(config: TrainingConfig, path: str) -> None:
         "save_steps": config.save_steps,
         "save_total_limit": config.save_total_limit,
         "eval_steps": config.eval_steps,
-        "evaluation_strategy": config.evaluation_strategy,
+        "eval_strategy": config.eval_strategy,
         "gradient_checkpointing": config.gradient_checkpointing,
         "bf16": config.bf16,
         "tf32": config.tf32,

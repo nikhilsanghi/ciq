@@ -301,17 +301,14 @@ def prepare_model_for_training(
 
     # Step 1: Prepare for k-bit training
     # This enables gradient computation through the quantized layers
-    model = prepare_model_for_kbit_training(
-        model,
-        use_gradient_checkpointing=gradient_checkpointing,
-    )
+    # Note: use_gradient_checkpointing parameter was removed in peft 0.13+
+    model = prepare_model_for_kbit_training(model)
 
     # Step 2: Enable gradient checkpointing if requested
     # WHY: Essential for fitting 7B models on 12GB GPUs
+    # Note: enable_input_require_grads() is deprecated and no longer needed
     if gradient_checkpointing:
         model.gradient_checkpointing_enable()
-        # Required for gradient checkpointing to work with LoRA
-        model.enable_input_require_grads()
         logger.info("Gradient checkpointing enabled (saves ~50% VRAM)")
 
     # Step 3: Add LoRA adapters
@@ -512,7 +509,7 @@ def train_model(
         >>> trainer = train_model(config)
         >>> trainer.save_model("./final-model")
     """
-    from trl import SFTTrainer
+    from trl import SFTTrainer, SFTConfig
 
     # Check GPU availability
     gpu_info = check_gpu_availability()
@@ -611,24 +608,25 @@ def train_model(
     # Step 6: Create trainer and train
     logger.info("Step 6/6: Initializing SFTTrainer...")
 
-    # Get training arguments
-    training_args = config.to_training_arguments()
+    # Get SFTConfig (TRL 0.12+ API - combines TrainingArguments with SFT-specific params)
+    sft_config = config.to_sft_config(
+        dataset_text_field="text",  # Column containing formatted prompts
+        packing=False,  # Disable packing for better loss computation
+    )
 
     # Handle checkpoint resumption
     if resume_from_checkpoint:
-        training_args.resume_from_checkpoint = resume_from_checkpoint
+        sft_config.resume_from_checkpoint = resume_from_checkpoint
         logger.info(f"Resuming from checkpoint: {resume_from_checkpoint}")
 
-    # Create SFTTrainer
+    # Create SFTTrainer with SFTConfig (TRL 0.12+ API)
+    # Note: max_seq_length, dataset_text_field, and packing are now in SFTConfig
     trainer = SFTTrainer(
         model=model,
-        args=training_args,
+        args=sft_config,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processing_class=tokenizer,
-        dataset_text_field="text",  # Column containing formatted prompts
-        max_seq_length=config.max_seq_length,
-        packing=False,  # Disable packing for better loss computation
     )
 
     # Save config for reproducibility
