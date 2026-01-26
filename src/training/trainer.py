@@ -614,6 +614,14 @@ def train_model(
         packing=False,  # Disable packing for better loss computation
     )
 
+    # Disable evaluation if no eval dataset provided
+    if eval_dataset is None:
+        if hasattr(sft_config, 'eval_strategy'):
+            sft_config.eval_strategy = "no"
+        elif hasattr(sft_config, 'evaluation_strategy'):
+            sft_config.evaluation_strategy = "no"
+        logger.info("No eval dataset provided - disabling evaluation")
+
     # Handle checkpoint resumption
     if resume_from_checkpoint:
         sft_config.resume_from_checkpoint = resume_from_checkpoint
