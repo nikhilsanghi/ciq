@@ -19,25 +19,29 @@ import time
 from typing import Optional, Dict, Any
 import json
 
-# Configuration
-VLLM_BASE_URL = "http://localhost:8000/v1"
+# Configuration - Two vLLM servers for side-by-side comparison
+VLLM_FINETUNED_URL = "http://localhost:8000/v1"  # Fine-tuned model
+VLLM_BASE_URL = "http://localhost:8001/v1"       # Base model
 
-# Available models (will be populated dynamically)
+# Available models with their respective API endpoints
 MODELS = {
     "mistral-base": {
         "name": "Mistral-7B (Base)",
         "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "api_url": VLLM_BASE_URL,
         "description": "Original Mistral-7B without fine-tuning"
     },
     "mistral-finetuned": {
         "name": "Mistral-7B (Fine-tuned)",
         "model_id": "ciq-model",
+        "api_url": VLLM_FINETUNED_URL,
         "description": "Fine-tuned on 50K e-commerce examples"
     },
     # Future models
     # "llama-finetuned": {
     #     "name": "LLaMA-3-8B (Fine-tuned)",
     #     "model_id": "llama-ciq-model",
+    #     "api_url": VLLM_FINETUNED_URL,
     #     "description": "Fine-tuned LLaMA-3 for e-commerce"
     # },
 }
@@ -117,15 +121,16 @@ def format_prompt(product_text: str, task_type: str) -> str:
 def query_model(
     model_id: str,
     prompt: str,
+    api_url: str,
     max_tokens: int = 100,
     temperature: float = 0.1,
 ) -> Dict[str, Any]:
-    """Query the vLLM server."""
+    """Query a vLLM server at the specified API URL."""
     try:
         start_time = time.time()
 
         response = requests.post(
-            f"{VLLM_BASE_URL}/completions",
+            f"{api_url}/completions",
             json={
                 "model": model_id,
                 "prompt": prompt,
@@ -155,7 +160,7 @@ def query_model(
     except requests.exceptions.ConnectionError:
         return {
             "success": False,
-            "error": "Cannot connect to vLLM server. Make sure it's running on port 8000.",
+            "error": f"Cannot connect to vLLM server at {api_url}.",
             "time": 0,
         }
     except Exception as e:
@@ -167,15 +172,25 @@ def query_model(
 
 
 def get_available_models() -> list:
-    """Check which models are available on the vLLM server."""
+    """Check which models are available on both vLLM servers."""
+    models = []
+    # Check fine-tuned server (port 8000)
+    try:
+        response = requests.get(f"{VLLM_FINETUNED_URL}/models", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            models.extend([m["id"] for m in data.get("data", [])])
+    except:
+        pass
+    # Check base model server (port 8001)
     try:
         response = requests.get(f"{VLLM_BASE_URL}/models", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            return [m["id"] for m in data.get("data", [])]
+            models.extend([m["id"] for m in data.get("data", [])])
     except:
         pass
-    return []
+    return models
 
 
 def main():
@@ -312,6 +327,7 @@ def main():
                             result = query_model(
                                 model_info["model_id"],
                                 formatted_prompt,
+                                api_url=model_info["api_url"],
                                 max_tokens=max_tokens,
                                 temperature=temperature,
                             )
