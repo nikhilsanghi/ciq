@@ -331,6 +331,7 @@ def train(
     output_validation_steps: int = 500,
     use_flash_attention: bool = True,  # Enable Flash Attention 2 for 2-3x speedup
     packing: bool = True,  # Pack multiple sequences for efficiency
+    use_torch_compile: bool = False,  # torch.compile for extra 10-20% speedup (experimental)
 ):
     """
     Main training function with output validation.
@@ -354,6 +355,7 @@ def train(
         "max_seq_length": max_seq_length,
         "use_flash_attention": use_flash_attention,
         "packing": packing,
+        "use_torch_compile": use_torch_compile,
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -373,6 +375,11 @@ def train(
 
     # Add LoRA adapters
     model = add_lora_adapters(model, lora_r, lora_alpha)
+
+    # Optional: torch.compile for extra speedup (experimental with quantized models)
+    if use_torch_compile:
+        logger.info("Applying torch.compile (this may take a few minutes on first run)...")
+        model = torch.compile(model)
 
     # Prepare datasets
     train_dataset = prepare_dataset(train_data, tokenizer)
@@ -474,6 +481,8 @@ def main():
                        help="Disable Flash Attention 2 (not recommended)")
     parser.add_argument("--no_packing", action="store_true",
                        help="Disable sequence packing")
+    parser.add_argument("--torch_compile", action="store_true",
+                       help="Enable torch.compile for extra 10-20%% speedup (experimental)")
 
     args = parser.parse_args()
 
@@ -494,6 +503,7 @@ def main():
         output_validation_steps=args.output_validation_steps,
         use_flash_attention=not args.no_flash_attention,
         packing=not args.no_packing,
+        use_torch_compile=args.torch_compile,
     )
 
 
