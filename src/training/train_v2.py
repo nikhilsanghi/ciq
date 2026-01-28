@@ -321,7 +321,7 @@ def train(
     epochs: int = 3,
     batch_size: int = 4,  # Increased from 2 (flash attention allows larger batches)
     gradient_accumulation: int = 4,  # Reduced from 8 (same effective batch size, faster)
-    learning_rate: float = 2e-4,
+    learning_rate: float = 1e-4,  # Reduced from 2e-4 for safer training
     lora_r: int = 32,
     lora_alpha: int = 64,
     max_seq_length: int = 2048,
@@ -330,7 +330,7 @@ def train(
     logging_steps: int = 50,
     output_validation_steps: int = 500,
     use_flash_attention: bool = True,  # Enable Flash Attention 2 for 2-3x speedup
-    packing: bool = True,  # Pack multiple sequences for efficiency
+    packing: bool = False,  # DISABLED by default - causes issues with some datasets
     use_torch_compile: bool = False,  # torch.compile for extra 10-20% speedup (experimental)
 ):
     """
@@ -477,7 +477,8 @@ def main():
                        help="Per-device batch size (default: 4 with flash attention)")
     parser.add_argument("--gradient_accumulation", type=int, default=4,
                        help="Gradient accumulation steps (default: 4)")
-    parser.add_argument("--learning_rate", type=float, default=2e-4)
+    parser.add_argument("--learning_rate", type=float, default=1e-4,
+                       help="Learning rate (default: 1e-4, safer for fine-tuning)")
     parser.add_argument("--lora_r", type=int, default=32)
     parser.add_argument("--lora_alpha", type=int, default=64)
     parser.add_argument("--max_seq_length", type=int, default=2048)
