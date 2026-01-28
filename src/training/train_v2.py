@@ -331,6 +331,7 @@ def train(
     output_validation_steps: int = 500,
     use_flash_attention: bool = True,  # Enable Flash Attention 2 for 2-3x speedup
     packing: bool = False,  # DISABLED by default - causes issues with some datasets
+    gradient_checkpointing: bool = True,  # Trade compute for memory (disable to use more GPU mem)
     use_torch_compile: bool = False,  # torch.compile for extra 10-20% speedup (experimental)
 ):
     """
@@ -363,6 +364,7 @@ def train(
         "max_seq_length": max_seq_length,
         "use_flash_attention": use_flash_attention,
         "packing": packing,
+        "gradient_checkpointing": gradient_checkpointing,
         "use_torch_compile": use_torch_compile,
         "timestamp": datetime.now().isoformat(),
     }
@@ -420,7 +422,7 @@ def train(
         eval_strategy="steps" if eval_dataset else "no",
         save_total_limit=3,
         bf16=True,
-        gradient_checkpointing=True,
+        gradient_checkpointing=gradient_checkpointing,
         max_length=max_seq_length,  # TRL 0.27+ uses max_length instead of max_seq_length
         dataset_text_field="text",
         packing=packing,  # Pack multiple short sequences into one for efficiency
@@ -490,6 +492,8 @@ def main():
                        help="Disable Flash Attention 2 (not recommended)")
     parser.add_argument("--packing", action="store_true",
                        help="Enable sequence packing (can cause issues, disabled by default)")
+    parser.add_argument("--no_gradient_checkpointing", action="store_true",
+                       help="Disable gradient checkpointing (uses more memory but faster)")
     parser.add_argument("--torch_compile", action="store_true",
                        help="Enable torch.compile for extra 10-20%% speedup (experimental)")
 
@@ -512,6 +516,7 @@ def main():
         output_validation_steps=args.output_validation_steps,
         use_flash_attention=not args.no_flash_attention,
         packing=args.packing,  # Disabled by default, use --packing to enable
+        gradient_checkpointing=not args.no_gradient_checkpointing,
         use_torch_compile=args.torch_compile,
     )
 
