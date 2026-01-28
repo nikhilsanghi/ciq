@@ -488,8 +488,8 @@ def main():
                        help="Validate actual model outputs every N steps")
     parser.add_argument("--no_flash_attention", action="store_true",
                        help="Disable Flash Attention 2 (not recommended)")
-    parser.add_argument("--no_packing", action="store_true",
-                       help="Disable sequence packing")
+    parser.add_argument("--packing", action="store_true",
+                       help="Enable sequence packing (can cause issues, disabled by default)")
     parser.add_argument("--torch_compile", action="store_true",
                        help="Enable torch.compile for extra 10-20%% speedup (experimental)")
 
@@ -511,7 +511,7 @@ def main():
         save_steps=args.save_steps,
         output_validation_steps=args.output_validation_steps,
         use_flash_attention=not args.no_flash_attention,
-        packing=not args.no_packing,
+        packing=args.packing,  # Disabled by default, use --packing to enable
         use_torch_compile=args.torch_compile,
     )
 
