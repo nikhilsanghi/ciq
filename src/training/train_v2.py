@@ -211,9 +211,10 @@ class OutputValidationCallback(TrainerCallback):
         return False
 
 
-def load_quantized_model(model_name: str):
-    """Load model with 4-bit quantization."""
+def load_quantized_model(model_name: str, use_flash_attention: bool = True):
+    """Load model with 4-bit quantization and Flash Attention 2."""
     logger.info(f"Loading model: {model_name}")
+    logger.info(f"Flash Attention 2: {'ENABLED' if use_flash_attention else 'DISABLED'}")
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -222,12 +223,17 @@ def load_quantized_model(model_name: str):
         bnb_4bit_use_double_quant=True,
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        trust_remote_code=True,
-    )
+    # Flash Attention 2 provides 2-3x speedup and reduced memory usage
+    model_kwargs = {
+        "quantization_config": bnb_config,
+        "device_map": "auto",
+        "trust_remote_code": True,
+    }
+
+    if use_flash_attention:
+        model_kwargs["attn_implementation"] = "flash_attention_2"
+
+    model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
 
     return model
 
@@ -313,8 +319,8 @@ def train(
     eval_data: Optional[str] = "data/processed/val.jsonl",
     output_dir: str = "outputs/ciq-model-v2",
     epochs: int = 3,
-    batch_size: int = 2,
-    gradient_accumulation: int = 8,
+    batch_size: int = 4,  # Increased from 2 (flash attention allows larger batches)
+    gradient_accumulation: int = 4,  # Reduced from 8 (same effective batch size, faster)
     learning_rate: float = 2e-4,
     lora_r: int = 32,
     lora_alpha: int = 64,
@@ -323,6 +329,8 @@ def train(
     save_steps: int = 500,
     logging_steps: int = 50,
     output_validation_steps: int = 500,
+    use_flash_attention: bool = True,  # Enable Flash Attention 2 for 2-3x speedup
+    packing: bool = True,  # Pack multiple sequences for efficiency
 ):
     """
     Main training function with output validation.
@@ -344,6 +352,8 @@ def train(
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
         "max_seq_length": max_seq_length,
+        "use_flash_attention": use_flash_attention,
+        "packing": packing,
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -358,7 +368,7 @@ def train(
     logger.info("="*60)
 
     # Load model and tokenizer
-    model = load_quantized_model(model_name)
+    model = load_quantized_model(model_name, use_flash_attention=use_flash_attention)
     tokenizer = setup_tokenizer(model_name, max_seq_length)
 
     # Add LoRA adapters
@@ -398,6 +408,7 @@ def train(
         gradient_checkpointing=True,
         max_seq_length=max_seq_length,
         dataset_text_field="text",
+        packing=packing,  # Pack multiple short sequences into one for efficiency
         report_to="tensorboard",
     )
 
@@ -447,8 +458,10 @@ def main():
     parser.add_argument("--eval_data", type=str, default=None)
     parser.add_argument("--output_dir", type=str, default="outputs/ciq-model-v2")
     parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--batch_size", type=int, default=2)
-    parser.add_argument("--gradient_accumulation", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=4,
+                       help="Per-device batch size (default: 4 with flash attention)")
+    parser.add_argument("--gradient_accumulation", type=int, default=4,
+                       help="Gradient accumulation steps (default: 4)")
     parser.add_argument("--learning_rate", type=float, default=2e-4)
     parser.add_argument("--lora_r", type=int, default=32)
     parser.add_argument("--lora_alpha", type=int, default=64)
@@ -457,6 +470,10 @@ def main():
     parser.add_argument("--save_steps", type=int, default=500)
     parser.add_argument("--output_validation_steps", type=int, default=500,
                        help="Validate actual model outputs every N steps")
+    parser.add_argument("--no_flash_attention", action="store_true",
+                       help="Disable Flash Attention 2 (not recommended)")
+    parser.add_argument("--no_packing", action="store_true",
+                       help="Disable sequence packing")
 
     args = parser.parse_args()
 
@@ -475,6 +492,8 @@ def main():
         eval_steps=args.eval_steps,
         save_steps=args.save_steps,
         output_validation_steps=args.output_validation_steps,
+        use_flash_attention=not args.no_flash_attention,
+        packing=not args.no_packing,
     )
 
 
