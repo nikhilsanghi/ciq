@@ -340,6 +340,14 @@ def train(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    # Setup file logging - saves all console output for debugging
+    log_file = output_path / "training.log"
+    file_handler = logging.FileHandler(log_file, mode='w')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logging.getLogger().addHandler(file_handler)
+    logger.info(f"Logging to file: {log_file}")
+
     # Log training config
     config = {
         "model_name": model_name,
@@ -413,7 +421,7 @@ def train(
         save_total_limit=3,
         bf16=True,
         gradient_checkpointing=True,
-        max_seq_length=max_seq_length,
+        max_length=max_seq_length,  # TRL 0.27+ uses max_length instead of max_seq_length
         dataset_text_field="text",
         packing=packing,  # Pack multiple short sequences into one for efficiency
         report_to="tensorboard",
