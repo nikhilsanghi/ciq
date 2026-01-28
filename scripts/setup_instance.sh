@@ -86,6 +86,14 @@ echo "-------------------------------"
 pip install -r requirements.txt
 log_success "Requirements installed"
 
+# Step 7b: Install Flash Attention (2-3x faster training)
+echo ""
+echo "Step 7b: Installing Flash Attention"
+echo "------------------------------------"
+echo "This may take 5-10 minutes to compile..."
+pip install flash-attn --no-build-isolation || log_warning "Flash Attention install failed (optional, training will still work)"
+python -c "import flash_attn; print('Flash Attention: OK')" && log_success "Flash Attention installed" || log_warning "Flash Attention not available"
+
 # Step 8: Verify installation
 echo ""
 echo "Step 8: Verifying Installation"
@@ -105,45 +113,69 @@ python -c "import tensorboard; print('TensorBoard: OK')" || log_error "TensorBoa
 
 log_success "All packages verified"
 
-# Step 9: Download datasets
+# Step 9: Download datasets (ESCI + ECInstruct + Alpaca)
+# NOTE: These datasets are self-contained and don't require external dependencies
+# Unlike MAVE (needs 21GB Amazon data) and AmazonQA (lacks product descriptions)
 echo ""
 echo "Step 9: Downloading Datasets"
 echo "----------------------------"
-mkdir -p data/raw/{mave,amazonqa,taxonomy}
+mkdir -p data/raw/taxonomy
 
 # Google Taxonomy
 echo "Downloading Google Product Taxonomy..."
-wget -q https://www.google.com/basepages/producttype/taxonomy.en-US.txt \
+wget -q https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt \
     -O data/raw/taxonomy/google_taxonomy.txt
 log_success "Google Taxonomy downloaded"
 
-# AmazonQA
-echo "Downloading AmazonQA train set..."
-wget -q https://amazon-qa.s3-us-west-2.amazonaws.com/train-qar.jsonl \
-    -O data/raw/amazonqa/train.jsonl
-echo "Downloading AmazonQA validation set..."
-wget -q https://amazon-qa.s3-us-west-2.amazonaws.com/val-qar.jsonl \
-    -O data/raw/amazonqa/val.jsonl
-log_success "AmazonQA downloaded"
+# Amazon ESCI (has actual product titles, descriptions, categories)
+echo "Downloading Amazon ESCI (130K products with full text)..."
+python -c "
+from datasets import load_dataset
+print('  Loading tasksource/esci (us)...')
+d = load_dataset('tasksource/esci', 'us', split='train')
+d.to_json('data/raw/esci.jsonl')
+print(f'  Downloaded {len(d)} products')
+"
+log_success "Amazon ESCI downloaded"
 
-# MAVE (just clone, actual data needs Amazon Review Data 2018)
-echo "Cloning MAVE repository..."
-if [ ! -d "data/raw/mave/.git" ]; then
-    git clone https://github.com/google-research-datasets/MAVE.git data/raw/mave/
-fi
-log_success "MAVE cloned (note: requires Amazon Review Data 2018 for full data)"
+# ECInstruct (pre-formatted e-commerce tasks including Q&A)
+echo "Downloading ECInstruct (116K e-commerce task examples)..."
+python -c "
+from datasets import load_dataset
+print('  Loading NingLab/ECInstruct...')
+d = load_dataset('NingLab/ECInstruct', split='train')
+d.to_json('data/raw/ecinstruct.jsonl')
+print(f'  Downloaded {len(d)} examples')
+"
+log_success "ECInstruct downloaded"
+
+# Alpaca (general instructions to prevent catastrophic forgetting)
+echo "Downloading Alpaca (52K general instructions)..."
+python -c "
+from datasets import load_dataset
+print('  Loading tatsu-lab/alpaca...')
+d = load_dataset('tatsu-lab/alpaca', split='train')
+d.to_json('data/raw/alpaca.jsonl')
+print(f'  Downloaded {len(d)} examples')
+"
+log_success "Alpaca downloaded"
 
 # Step 10: Verify datasets
 echo ""
 echo "Step 10: Verifying Datasets"
 echo "---------------------------"
 echo "Google Taxonomy categories: $(wc -l < data/raw/taxonomy/google_taxonomy.txt)"
-echo "AmazonQA train samples: $(wc -l < data/raw/amazonqa/train.jsonl)"
-echo "AmazonQA val samples: $(wc -l < data/raw/amazonqa/val.jsonl)"
+echo "ESCI products: $(wc -l < data/raw/esci.jsonl)"
+echo "ECInstruct examples: $(wc -l < data/raw/ecinstruct.jsonl)"
+echo "Alpaca examples: $(wc -l < data/raw/alpaca.jsonl)"
 
 echo ""
-echo "Sample AmazonQA entry:"
-head -1 data/raw/amazonqa/train.jsonl | python -m json.tool 2>/dev/null || head -1 data/raw/amazonqa/train.jsonl
+echo "=== Sample ESCI Entry (has actual product text!) ==="
+head -1 data/raw/esci.jsonl | python -m json.tool 2>/dev/null | head -15
+
+echo ""
+echo "=== Sample ECInstruct Entry ==="
+head -1 data/raw/ecinstruct.jsonl | python -m json.tool 2>/dev/null | head -15
 
 # Final summary
 echo ""
@@ -151,24 +183,47 @@ echo "=========================================="
 echo "Setup Complete!"
 echo "=========================================="
 echo ""
-echo "Next steps:"
-echo "1. Prepare training data:"
-echo "   python -m src.data.prepare_training_data --output_dir data/processed --include_general"
+echo "Environment:"
+python -c "import torch; print(f'  PyTorch: {torch.__version__}')"
+python -c "import torch; print(f'  CUDA: {torch.version.cuda}')"
+python -c "import flash_attn; print('  Flash Attention: Available')" 2>/dev/null || echo "  Flash Attention: Not available"
 echo ""
-echo "2. Start vLLM for base model testing:"
+echo "=========================================="
+echo "Next Steps"
+echo "=========================================="
+echo ""
+echo "1. Prepare training data (v2 - uses ESCI + ECInstruct):"
+echo "   python -m src.data.prepare_training_data_v2 --output_dir data/processed"
+echo ""
+echo "2. Validate data format:"
+echo "   head -1 data/processed/train.jsonl | python -m json.tool"
+echo "   echo 'Classification:' && grep -c '\\[CLASSIFY\\]' data/processed/train.jsonl"
+echo "   echo 'Extraction:' && grep -c '\\[EXTRACT\\]' data/processed/train.jsonl"
+echo "   echo 'Q&A:' && grep -c '\\[QA\\]' data/processed/train.jsonl"
+echo ""
+echo "3. Start vLLM for base model testing:"
 echo "   nohup python -m vllm.entrypoints.openai.api_server \\"
 echo "       --model mistralai/Mistral-7B-Instruct-v0.3 \\"
 echo "       --host 0.0.0.0 --port 8000 --dtype half \\"
 echo "       --max-model-len 2048 --gpu-memory-utilization 0.85 \\"
 echo "       > logs/vllm.log 2>&1 &"
 echo ""
-echo "3. Start Streamlit demo:"
+echo "4. Start Streamlit demo:"
 echo "   nohup streamlit run app/demo.py --server.port 8501 --server.address 0.0.0.0 > logs/streamlit.log 2>&1 &"
 echo ""
-echo "4. Train model:"
+echo "5. Train model (OPTIMIZED - uses Flash Attention + larger batch):"
 echo "   python -m src.training.train_v2 \\"
 echo "       --train_data data/processed/train.jsonl \\"
 echo "       --eval_data data/processed/val.jsonl \\"
 echo "       --output_dir outputs/ciq-model-v2 \\"
-echo "       --epochs 3"
+echo "       --epochs 3 \\"
+echo "       --batch_size 8 \\"
+echo "       --gradient_accumulation 4 \\"
+echo "       --max_seq_length 1024"
+echo ""
+echo "   Expected: ~40-50 min for 45K examples (vs 3 hours with default settings)"
+echo ""
+echo "6. After training, compare models:"
+echo "   ./scripts/start_multi_model.sh"
+echo "   ./scripts/start_compare_demo.sh"
 echo ""

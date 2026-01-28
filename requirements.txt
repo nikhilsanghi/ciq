@@ -49,10 +49,10 @@ wandb>=0.16.0
 # Optional: AWQ Quantization
 # autoawq>=0.1.8
 
-# Optional: Flash Attention (2-3x faster training)
-# Only install if PyTorch/CUDA versions match
-# pip install flash-attn --no-build-isolation
-# flash-attn>=2.5.0
+# Flash Attention (2-3x faster training)
+# Note: Requires matching PyTorch/CUDA versions
+# Install separately: pip install flash-attn --no-build-isolation
+flash-attn>=2.5.0
 
 # Development
 pytest>=7.4.0

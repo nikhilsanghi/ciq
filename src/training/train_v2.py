@@ -48,21 +48,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Sample prompts for validation - must match inference format exactly!
+# Sample prompts for validation - MUST match inference format from src/api/main.py EXACTLY!
+# Note: Classification removed since we don't have taxonomy-labeled training data
 VALIDATION_PROMPTS = [
     {
-        "task": "classify",
-        "prompt": "[CLASSIFY] Classify into Google Product Taxonomy.\n\nProduct: Sony WH-1000XM5 Wireless Noise Canceling Headphones",
-        "expected_contains": ["Electronics", "Audio", "Headphones"],
-    },
-    {
         "task": "extract",
-        "prompt": "[EXTRACT] Extract product attributes as JSON.\n\nProduct: Apple iPhone 15 Pro 256GB Natural Titanium",
-        "expected_contains": ["Apple", "iPhone", "256"],
+        "prompt": """[EXTRACT] Extract all product attributes from the following text as JSON key-value pairs.
+
+Product: Apple iPhone 15 Pro 256GB Natural Titanium
+
+Respond with a valid JSON object containing attribute names as keys and their values.
+Example: {"brand": "Nike", "size": "Large", "color": "Blue"}
+
+Attributes:""",
+        "expected_contains": ["Apple", "iPhone", "256", "{"],
     },
     {
         "task": "qa",
-        "prompt": "[QA] Answer the question about this product.\n\nProduct: MacBook Air with 18-hour battery life\nQuestion: How long does the battery last?",
+        "prompt": """[QA] Answer the question about the product based on the provided information.
+
+Product Information:
+MacBook Air M3 15-inch with 18-hour battery life, 8GB RAM, 256GB SSD
+
+Question: How long does the battery last?
+
+Provide a concise and accurate answer based only on the available information.
+
+Answer:""",
         "expected_contains": ["18", "hour"],
     },
 ]
